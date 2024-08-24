@@ -10,10 +10,10 @@ import (
 type FullDynTCIndex interface {
 	NewIndex(graph gograph.Graph[string])
 
-	insertEdge(src string, dst string) error
-	deleteEdge(src string, dst string) error
+	InsertEdge(src string, dst string) error
+	DeleteEdge(src string, dst string) error
 
-	checkReachability(src string, dst string) (bool, error)
+	CheckReachability(src string, dst string) (bool, error)
 }
 
 type SV1 struct {
@@ -41,12 +41,22 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	vertices := algo.Graph.GetAllVertices()
 	randomIndex := rand.Intn(len(vertices))
 	algo.SV = vertices[randomIndex]
+	//TODO: make sure this is not a isolated vertext and repick if it is
 
 	//initialize R_Plus
 	for _, v := range vertices {
 		algo.R_Plus[v.Label()] = false
 	}
+	algo.recomputeRPlus()
 
+	//initialize R_Minus
+	for _, v := range vertices {
+		algo.R_Minus[v.Label()] = false
+	}
+	algo.recomputeRMinus()
+}
+
+func (algo *SV1) recomputeRPlus() {
 	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, algo.SV.Label())
 	if err != nil {
 		panic(err)
@@ -55,13 +65,9 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 		algo.R_Plus[v.Label()] = true
 		return nil
 	})
-	//------------------
+}
 
-	//initialize R_Minus
-	for _, v := range vertices {
-		algo.R_Minus[v.Label()] = false
-	}
-
+func (algo *SV1) recomputeRMinus() {
 	bfs_rev, err := traverse.NewBreadthFirstIterator(algo.ReverseGraph, algo.SV.Label())
 	if err != nil {
 		panic(err)
@@ -72,27 +78,34 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	})
 }
 
-func (algo *SV1) insertEdge(src string, dst string) error {
+func (algo *SV1) InsertEdge(src string, dst string) error {
 	srcVertex := algo.Graph.GetVertexByID(src)
 	if srcVertex == nil {
 		srcVertex = gograph.NewVertex(src)
 		algo.Graph.AddVertex(srcVertex)
+		algo.R_Plus[src] = false
+		algo.R_Minus[src] = false
 	}
 
 	dstVertex := algo.Graph.GetVertexByID(dst)
 	if dstVertex == nil {
 		dstVertex = gograph.NewVertex(dst)
 		algo.Graph.AddVertex(dstVertex)
+		algo.R_Plus[dst] = false
+		algo.R_Minus[dst] = false
 	}
 
 	algo.Graph.AddEdge(srcVertex, dstVertex)
 	algo.ReverseGraph.AddEdge(dstVertex, srcVertex)
 
-	//TODO: UPDATE R+ AND R-
+	//update R+ and R-
+	//TODO: Make this not be a full recompute using an SSR data structure
+	algo.recomputeRPlus()
+	algo.recomputeRMinus()
 	return nil
 }
 
-func (algo *SV1) deleteEdge(src string, dst string) error {
+func (algo *SV1) DeleteEdge(src string, dst string) error {
 	srcVertex := algo.Graph.GetVertexByID(src)
 	dstVertex := algo.Graph.GetVertexByID(dst)
 
@@ -103,18 +116,54 @@ func (algo *SV1) deleteEdge(src string, dst string) error {
 	algo.ReverseGraph.RemoveEdges(rev_edge)
 	//TODO: Add error handling here for if vertex or edge does not exist
 
-	//TODO: UPDATE R+ AND R-
+	//TODO: Make this not be a full recompute using an SSR data structure
+	algo.recomputeRPlus()
+	algo.recomputeRMinus()
 	return nil
 }
 
+func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
+	svLabel := algo.SV.Label()
+
+	//if src is support vertex
+	if svLabel == src {
+		return algo.R_Plus[dst], nil
+	}
+
+	//if dest is support vertex
+	if svLabel == dst {
+		return algo.R_Minus[dst], nil
+	}
+
+	//try to apply O1
+	if algo.R_Minus[src] == true && algo.R_Minus[dst] == true {
+		return true, nil
+	}
+
+	//try to apply O2
+	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
+		return false, nil
+	}
+
+	//try to apply O3
+	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
+		return false, nil
+	}
+
+	//if all else fails, fallback to BFS
+	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, src)
+	if err != nil {
+		return false, err
+	}
+	for bfs.HasNext() {
+		v := bfs.Next()
+		if v.Label() == dst {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func main() {
-	graph := gograph.New[int](gograph.Directed())
-
-	//bfs, err := traverse.NewBreadthFirstIterator[int](graph, 1)
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	graph.GetAllVerticesByID()
 
 }
