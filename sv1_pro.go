@@ -41,7 +41,12 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	vertices := algo.Graph.GetAllVertices()
 	randomIndex := rand.Intn(len(vertices))
 	algo.SV = vertices[randomIndex]
-	//TODO: make sure this is not a isolated vertext and repick if it is
+
+	//make sure this is not a isolated vertex and repick if it is
+	for algo.SV.Degree() == 0 {
+		randomIndex = rand.Intn(len(vertices))
+		algo.SV = vertices[randomIndex]
+	}
 
 	//initialize R_Plus
 	for _, v := range vertices {
@@ -106,6 +111,9 @@ func (algo *SV1) InsertEdge(src string, dst string) error {
 }
 
 func (algo *SV1) DeleteEdge(src string, dst string) error {
+	//TODO: Check if either src or dst are isolated after edgedelete and delete the node if they are not schema nodes
+	//TODO: IF deleted node is SV or if SV gets isolated repick SV
+
 	srcVertex := algo.Graph.GetVertexByID(src)
 	dstVertex := algo.Graph.GetVertexByID(dst)
 
