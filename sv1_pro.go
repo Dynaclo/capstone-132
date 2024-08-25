@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/hmdsefi/gograph"
 	"github.com/hmdsefi/gograph/traverse"
 	"math/rand"
@@ -47,14 +48,17 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 		randomIndex = rand.Intn(len(vertices))
 		algo.SV = vertices[randomIndex]
 	}
+	fmt.Println(algo.SV.Label(), " chosen as SV")
 
 	//initialize R_Plus
+	algo.R_Plus = make(map[string]bool)
 	for _, v := range vertices {
 		algo.R_Plus[v.Label()] = false
 	}
 	algo.recomputeRPlus()
 
 	//initialize R_Minus
+	algo.R_Minus = make(map[string]bool)
 	for _, v := range vertices {
 		algo.R_Minus[v.Label()] = false
 	}
@@ -135,30 +139,36 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 
 	//if src is support vertex
 	if svLabel == src {
+		fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
 		return algo.R_Plus[dst], nil
 	}
 
 	//if dest is support vertex
 	if svLabel == dst {
+		fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
 		return algo.R_Minus[dst], nil
 	}
 
 	//try to apply O1
 	if algo.R_Minus[src] == true && algo.R_Minus[dst] == true {
+		fmt.Println("[CheckReachability][Resolved] Using O1")
 		return true, nil
 	}
 
 	//try to apply O2
 	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
+		fmt.Println("[CheckReachability][Resolved] Using O2")
 		return false, nil
 	}
 
 	//try to apply O3
 	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
+		fmt.Println("[CheckReachability][Resolved] Using O3")
 		return false, nil
 	}
 
 	//if all else fails, fallback to BFS
+	fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
 	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, src)
 	if err != nil {
 		return false, err
@@ -173,5 +183,32 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 }
 
 func main() {
+	graph := gograph.New[string](gograph.Directed())
 
+	a := gograph.NewVertex("a")
+	graph.AddVertex(a)
+	b := gograph.NewVertex("b")
+	graph.AddVertex(b)
+	c := gograph.NewVertex("c")
+	graph.AddVertex(c)
+	d := gograph.NewVertex("d")
+	graph.AddVertex(d)
+
+	graph.AddEdge(a, b)
+	graph.AddEdge(a, c)
+	graph.AddEdge(b, d)
+
+	index := SV1{}
+	index.NewIndex(graph)
+
+	fmt.Println(index.CheckReachability("a", "d"))
+	fmt.Println(index.CheckReachability("c", "d"))
+	fmt.Println(index.CheckReachability("b", "d"))
+	fmt.Println(index.CheckReachability("c", "a"))
+
+	index.InsertEdge("c", "e")
+	fmt.Println(index.CheckReachability("a", "e"))
+
+	index.DeleteEdge("a", "b")
+	fmt.Println(index.CheckReachability("a", "e"))
 }
