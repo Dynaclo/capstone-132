@@ -1,2 +1,4 @@
 .idea/
-graph_visualization.dot/
+graph_visualization.dot
+build/
+.DS_Store/

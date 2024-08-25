@@ -2,8 +2,17 @@ package main
 
 import (
 	"fmt"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
+	"math"
 	"math/rand"
 	"os"
+	"sort"
+	"strconv"
+	"time"
+
 	//"github.com/Smuzzy-waiii/capstone-132"
 	"github.com/hmdsefi/gograph"
 	//"github.com/hmdsefi/gograph/traverse"
@@ -32,7 +41,8 @@ type SV1 struct {
 // ok since it is a inti step tho ig
 func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	algo.Graph = graph
-
+	fmt.Printf("hiiii")
+	print(algo.Graph)
 	//make reverse DiGraph
 	algo.ReverseGraph = gograph.New[string](gograph.Directed())
 	for _, e := range algo.Graph.AllEdges() {
@@ -66,6 +76,28 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	}
 	algo.recomputeRMinus()
 }
+
+// func (algo *SV1) recomputeRPlus() {
+// 	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, algo.SV.Label())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	bfs.Iterate(func(v *gograph.Vertex[string]) error {
+// 		algo.R_Plus[v.Label()] = true
+// 		return nil
+// 	})
+// }
+
+// func (algo *SV1) recomputeRMinus() {
+// 	bfs_rev, err := traverse.NewBreadthFirstIterator(algo.ReverseGraph, algo.SV.Label())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	bfs_rev.Iterate(func(v *gograph.Vertex[string]) error {
+// 		algo.R_Minus[v.Label()] = true
+// 		return nil
+// 	})
+// }
 
 func (algo *SV1) recomputeRPlus() {
 	// Initialize a queue for BFS
@@ -211,6 +243,34 @@ func directedBFS(graph gograph.Graph[string], src string, dst string) (bool, err
 	// If we exhaust the queue without finding the destination, return false
 	return false, nil
 }
+func bfs(graph *gograph.Graph[string], src, dst string) bool {
+	visited := make(map[string]bool)
+	queue := []*gograph.Vertex[string]{(*graph).GetVertexByID(src)}
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if current.Label() == dst {
+			return true
+		}
+
+		if visited[current.Label()] {
+			continue
+		}
+		visited[current.Label()] = true
+
+		for _, edge := range (*graph).AllEdges() {
+			if edge.Source().Label() == current.Label() {
+				destVertex := edge.Destination()
+				if !visited[destVertex.Label()] {
+					queue = append(queue, destVertex)
+				}
+			}
+		}
+	}
+	return false
+}
 
 // Directed BFS implementation without a specific destination
 func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]string, error) {
@@ -255,45 +315,48 @@ func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]s
 func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 	svLabel := algo.SV.Label()
 
-	fmt.Print("[CheckReachability] Can ", src, " reach ", dst, " ? ")
-
 	//if src is support vertex
 	if svLabel == src {
-		fmt.Println("[Resolved] Src vertex is SV")
+		//fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
 		return algo.R_Plus[dst], nil
 	}
 
 	//if dest is support vertex
 	if svLabel == dst {
-		fmt.Println("[Resolved] Dst vertex is SV")
-		return algo.R_Minus[src], nil
+		//fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
+		return algo.R_Minus[dst], nil
 	}
 
 	//try to apply O1
 	if algo.R_Minus[src] == true && algo.R_Plus[dst] == true {
-		fmt.Println("[Resolved] Using O1")
+		//fmt.Println("[CheckReachability][Resolved] Using O1")
 		return true, nil
 	}
 
 	//try to apply O2
 	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
-		fmt.Println("[Resolved] Using O2")
+		//fmt.Println("[CheckReachability][Resolved] Using O2")
 		return false, nil
 	}
 
 	//try to apply O3
 	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
-		fmt.Println("[CheckReachability][Resolved] Using O3")
+		//fmt.Println("[CheckReachability][Resolved] Using O3")
 		return false, nil
 	}
 
 	//if all else fails, fallback to BFS
-	fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
+	//fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
 	bfs, err := directedBFS(algo.Graph, src, dst)
 	if err != nil {
 		return false, err
 	}
-
+	// for bfs.HasNext() {
+	// 	v := bfs.Next()
+	// 	if v.Label() == dst {
+	// 		return true, nil
+	// 	}
+	// }
 	if bfs == true {
 		return true, nil
 	}
@@ -323,109 +386,201 @@ func generateDotFile(graph gograph.Graph[string], filename string) error {
 	return err
 }
 
+func generateTestCases(graph *gograph.Graph[string], numCases int) [][2]string {
+	rand.Seed(time.Now().UnixNano())
+	vertices := (*graph).GetAllVertices()
+	vertexCount := len(vertices)
+
+	testCases := make([][2]string, numCases)
+	for i := 0; i < numCases; i++ {
+		srcIndex := rand.Intn(vertexCount)
+		dstIndex := rand.Intn(vertexCount)
+
+		testCases[i] = [2]string{
+			vertices[srcIndex].Label(),
+			vertices[dstIndex].Label(),
+		}
+	}
+
+	return testCases
+}
+
+func plotResults(bfsTimes, sv1Times []DataPoint) {
+	p := plot.New()
+
+	p.Title.Text = "BFS vs SV1 Performance"
+	p.X.Label.Text = "Test Cases"
+	p.Y.Label.Text = "Time (ns)"
+
+	// Set log scales for both axes
+	p.Y.Scale = plot.LogScale{}
+
+	pts1 := make(plotter.XYs, len(bfsTimes))
+	pts2 := make(plotter.XYs, len(sv1Times))
+
+	for i := range bfsTimes {
+		pts1[i].X = float64(i + 1)
+		pts1[i].Y = float64(bfsTimes[i].Duration)
+	}
+
+	for i := range sv1Times {
+		pts2[i].X = float64(i + 1)
+		pts2[i].Y = float64(sv1Times[i].Duration)
+	}
+
+	err := plotutil.AddLinePoints(p, "BFS", pts1, "SV1", pts2)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := p.Save(4*vg.Inch, 4*vg.Inch, "performance.png"); err != nil {
+		panic(err)
+	}
+}
+
 func main() {
+
+	// Initialize random seed
+	rand.Seed(time.Now().UnixNano())
+
+	// Create a new directed graph
 	graph := gograph.New[string](gograph.Directed())
 
-	a := gograph.NewVertex("a")
-	graph.AddVertex(a)
-	b := gograph.NewVertex("b")
-	graph.AddVertex(b)
-	c := gograph.NewVertex("c")
-	graph.AddVertex(c)
-	d := gograph.NewVertex("d")
-	graph.AddVertex(d)
+	// Create vertices
+	vertexCount := 300
+	vertices := make([]*gograph.Vertex[string], vertexCount)
+	for i := 0; i < vertexCount; i++ {
+		label := "v" + strconv.Itoa(i)
+		vertices[i] = gograph.NewVertex(label)
+		graph.AddVertex(vertices[i])
+	}
 
-	graph.AddEdge(a, b)
-	graph.AddEdge(a, c)
-	graph.AddEdge(b, d)
+	edgeCount := 1000
+	for i := 0; i < edgeCount; i++ {
+		srcIndex := rand.Intn(vertexCount)
+		dstIndex := rand.Intn(vertexCount)
 
+		// Ensure no self-loops
+		for srcIndex == dstIndex {
+			dstIndex = rand.Intn(vertexCount)
+		}
+
+		graph.AddEdge(vertices[srcIndex], vertices[dstIndex])
+		fmt.Printf("Edge added: %s -> %s\n", vertices[srcIndex].Label(), vertices[dstIndex].Label())
+	}
+
+	//for visualization
+	err := generateDotFile(graph, "graph_visualization.dot")
+	if err != nil {
+		fmt.Printf("Error generating dot file: %v\n", err)
+		return
+	}
+	fmt.Println("Dot file generated successfully: graph_visualization.dot")
+
+	// Initialize the SV1 transitive closure index
 	index := SV1{}
 	index.NewIndex(graph)
 
-	fmt.Println(index.CheckReachability("a", "d"))
-	fmt.Println(index.CheckReachability("c", "d"))
-	fmt.Println(index.CheckReachability("b", "d"))
-	fmt.Println(index.CheckReachability("c", "a"))
+	testcases := generateTestCases(&graph, 100)
 
-	index.InsertEdge("c", "e")
-	fmt.Println(index.CheckReachability("a", "e"))
+	fmt.Println("\nReachability Tests Using the SV1 Index:")
+	sv1Times := []DataPoint{}
+	for _, test := range testcases {
+		src, dst := test[0], test[1]
 
-	index.DeleteEdge("a", "c")
-	fmt.Println(index.CheckReachability("a", "e"))
+		startTime := time.Now()
+		_, err := index.CheckReachability(src, dst)
+		if err != nil {
+			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
+		}
+		endTime := time.Now()
+		timeTaken := endTime.Sub(startTime)
+
+		sv1Times = append(sv1Times, DataPoint{TimeOfEntry: startTime, Duration: timeTaken})
+	}
+	// Sort the data points by Duration
+	sort.Slice(sv1Times, func(i, j int) bool {
+		return sv1Times[i].Duration < sv1Times[j].Duration
+	})
+	printStatistics(sv1Times)
+
+	fmt.Println("\nReachability Tests Using the BFS:")
+	bfsTimes := []DataPoint{}
+	for _, test := range testcases {
+		src, dst := test[0], test[1]
+
+		startTime := time.Now()
+		_ = bfs(&graph, src, dst)
+		endTime := time.Now()
+		timeTaken := endTime.Sub(startTime)
+
+		bfsTimes = append(bfsTimes, DataPoint{TimeOfEntry: startTime, Duration: timeTaken})
+	}
+	// Sort the data points by Duration
+	sort.Slice(bfsTimes, func(i, j int) bool {
+		return bfsTimes[i].Duration < bfsTimes[j].Duration
+	})
+	printStatistics(bfsTimes)
+
+	plotResults(bfsTimes, sv1Times)
 }
 
-//func main() {
-//
-//
-//	// Initialize random seed
-//	rand.Seed(time.Now().UnixNano())
-//
-//	// Create a new directed graph
-//	graph := gograph.New[string](gograph.Directed())
-//
-//	// Create vertices
-//	vertexCount := 50
-//	vertices := make([]*gograph.Vertex[string], vertexCount)
-//	for i := 0; i < vertexCount; i++ {
-//		label := "v" + strconv.Itoa(i)
-//		vertices[i] = gograph.NewVertex(label)
-//		graph.AddVertex(vertices[i])
-//	}
-//
-//
-//	edgeCount := 100
-//	for i := 0; i < edgeCount; i++ {
-//		srcIndex := rand.Intn(vertexCount)
-//		dstIndex := rand.Intn(vertexCount)
-//
-//		// Ensure no self-loops
-//		for srcIndex == dstIndex {
-//			dstIndex = rand.Intn(vertexCount)
-//		}
-//
-//		graph.AddEdge(vertices[srcIndex], vertices[dstIndex])
-//		fmt.Printf("Edge added: %s -> %s\n", vertices[srcIndex].Label(), vertices[dstIndex].Label())
-//	}
-//
-//
-//
-//
-//
-//	//for visualization
-//	err := generateDotFile(graph, "graph_visualization.dot")
-//	if err != nil {
-//		fmt.Printf("Error generating dot file: %v\n", err)
-//		return
-//	}
-//	fmt.Println("Dot file generated successfully: graph_visualization.dot")
-//
-//
-//	// Initialize the SV1 transitive closure index
-//	index := SV1{}
-//	index.NewIndex(graph)
-//
-//	// Perform some reachability tests
-//	testCases := [][2]string{
-//		{"v0", "v10"},
-//		{"v10", "v20"},
-//		{"v20", "v30"},
-//		{"v30", "v40"},
-//		{"v40", "v0"},
-//		{"v5", "v25"},
-//		{"v25", "v5"},
-//		{"v48","v50"},
-//		{"v75","v32"},
-//
-//	}
-//
-//	fmt.Println("\nReachability Tests:")
-//	for _, test := range testCases {
-//		src, dst := test[0], test[1]
-//		reachable, err := index.CheckReachability(src, dst)
-//		if err != nil {
-//			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
-//		} else {
-//			fmt.Printf("Is %s reachable from %s? %v\n", dst, src, reachable)
-//		}
-//	}
-//}
+type DataPoint struct {
+	TimeOfEntry time.Time
+	Duration    time.Duration
+}
+
+func printStatistics(dataPoints []DataPoint) {
+	n := len(dataPoints)
+	if n == 0 {
+		fmt.Println("No data points available")
+		return
+	}
+
+	min_ := dataPoints[0].Duration
+	max_ := dataPoints[n-1].Duration
+	mean := calculateMean(dataPoints)
+	median := calculateMedian(dataPoints)
+	q1, q3 := calculateQuartiles(dataPoints)
+
+	fmt.Println("Statistics:")
+	fmt.Printf("Min: %v\n", min_)
+	fmt.Printf("Max: %v\n", max_)
+	fmt.Printf("Mean: %v\n", mean)
+	fmt.Printf("Median: %v\n", median)
+	fmt.Printf("Q1 (25th percentile): %v\n", q1)
+	fmt.Printf("Q3 (75th percentile): %v\n", q3)
+	fmt.Printf("99th percentile: %v\n", calculatePercentile(dataPoints, 99))
+	fmt.Printf("99.9th percentile: %v\n", calculatePercentile(dataPoints, 99.9))
+}
+
+func calculateMean(dataPoints []DataPoint) time.Duration {
+	total := time.Duration(0)
+	for _, dp := range dataPoints {
+		total += dp.Duration
+	}
+	return total / time.Duration(len(dataPoints))
+}
+
+func calculateMedian(dataPoints []DataPoint) time.Duration {
+	n := len(dataPoints)
+	if n%2 == 0 {
+		return (dataPoints[n/2-1].Duration + dataPoints[n/2].Duration) / 2
+	}
+	return dataPoints[n/2].Duration
+}
+
+func calculateQuartiles(dataPoints []DataPoint) (q1, q3 time.Duration) {
+	q1 = calculatePercentile(dataPoints, 25)
+	q3 = calculatePercentile(dataPoints, 75)
+	return
+}
+
+func calculatePercentile(dataPoints []DataPoint, percentile float64) time.Duration {
+	index := float64(len(dataPoints)) * percentile / 100.0
+	if index == float64(int(index)) {
+		i := int(index)
+		return (dataPoints[i-1].Duration + dataPoints[i].Duration) / 2
+	}
+	return dataPoints[int(math.Ceil(index))-1].Duration
+}
