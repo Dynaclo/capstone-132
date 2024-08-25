@@ -3,9 +3,10 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"time"
-
+	//"github.com/Smuzzy-waiii/capstone-132"
 	"github.com/hmdsefi/gograph"
 	"github.com/hmdsefi/gograph/traverse"
 )
@@ -184,7 +185,30 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 	}
 	return false, nil
 }
+func generateDotFile(graph gograph.Graph[string], filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
+	_, err = file.WriteString("digraph G {\n")
+	if err != nil {
+		return err
+	}
+
+	for _, edge := range graph.AllEdges() {
+		line := fmt.Sprintf("  \"%s\" -> \"%s\";\n", edge.Source().Label(), edge.Destination().Label())
+		_, err := file.WriteString(line)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = file.WriteString("}\n")
+	return err
+}
+ 
 func main() {
  
 
@@ -218,6 +242,19 @@ func main() {
 		fmt.Printf("Edge added: %s -> %s\n", vertices[srcIndex].Label(), vertices[dstIndex].Label())
 	}
 
+
+	
+	
+	
+	//for visualization 
+	err := generateDotFile(graph, "graph_visualization.dot")
+	if err != nil {
+		fmt.Printf("Error generating dot file: %v\n", err)
+		return
+	}
+	fmt.Println("Dot file generated successfully: graph_visualization.dot")
+
+
 	// Initialize the SV1 transitive closure index
 	index := SV1{}
 	index.NewIndex(graph)
@@ -232,6 +269,8 @@ func main() {
 		{"v5", "v25"},
 		{"v25", "v5"},
 		{"v48","v50"},
+		{"v75","v32"},
+		
 	}
 
 	fmt.Println("\nReachability Tests:")
