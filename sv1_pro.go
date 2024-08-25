@@ -8,7 +8,7 @@ import (
 	"time"
 	//"github.com/Smuzzy-waiii/capstone-132"
 	"github.com/hmdsefi/gograph"
-	"github.com/hmdsefi/gograph/traverse"
+	//"github.com/hmdsefi/gograph/traverse"
 )
 
 // Fully Dynamic Transitive Closure Index
@@ -34,7 +34,8 @@ type SV1 struct {
 // ok since it is a inti step tho ig
 func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	algo.Graph = graph
-
+	fmt.Printf("hiiii")
+	print(algo.Graph)
 	//make reverse DiGraph
 	algo.ReverseGraph = gograph.New[string](gograph.Directed())
 	for _, e := range algo.Graph.AllEdges() {
@@ -69,27 +70,88 @@ func (algo *SV1) NewIndex(graph gograph.Graph[string]) {
 	algo.recomputeRMinus()
 }
 
+// func (algo *SV1) recomputeRPlus() {
+// 	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, algo.SV.Label())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	bfs.Iterate(func(v *gograph.Vertex[string]) error {
+// 		algo.R_Plus[v.Label()] = true
+// 		return nil
+// 	})
+// }
+
+// func (algo *SV1) recomputeRMinus() {
+// 	bfs_rev, err := traverse.NewBreadthFirstIterator(algo.ReverseGraph, algo.SV.Label())
+// 	if err != nil {
+// 		panic(err)
+// 	}
+// 	bfs_rev.Iterate(func(v *gograph.Vertex[string]) error {
+// 		algo.R_Minus[v.Label()] = true
+// 		return nil
+// 	})
+// }
+
 func (algo *SV1) recomputeRPlus() {
-	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, algo.SV.Label())
-	if err != nil {
-		panic(err)
+	// Initialize a queue for BFS
+	queue := []*gograph.Vertex[string]{algo.SV}
+
+	// Reset R_Plus to mark all vertices as not reachable
+	for key := range algo.R_Plus {
+		algo.R_Plus[key] = false
 	}
-	bfs.Iterate(func(v *gograph.Vertex[string]) error {
-		algo.R_Plus[v.Label()] = true
-		return nil
-	})
+
+	// Start BFS
+	for len(queue) > 0 {
+		// Dequeue the front vertex
+		current := queue[0]
+		queue = queue[1:]
+
+		// Mark current vertex as reachable
+		algo.R_Plus[current.Label()] = true
+
+		// Enqueue all neighbors (vertices connected by an outgoing edge)
+		for _, edge := range algo.Graph.AllEdges() {
+			if edge.Source().Label() == current.Label() {
+				destVertex := edge.Destination()
+				if !algo.R_Plus[destVertex.Label()] {
+					queue = append(queue, destVertex)
+				}
+			}
+		}
+	}
 }
 
 func (algo *SV1) recomputeRMinus() {
-	bfs_rev, err := traverse.NewBreadthFirstIterator(algo.ReverseGraph, algo.SV.Label())
-	if err != nil {
-		panic(err)
+	// Initialize a queue for BFS
+	queue := []*gograph.Vertex[string]{algo.SV}
+
+	// Reset R_Minus to mark all vertices as not reachable
+	for key := range algo.R_Minus {
+		algo.R_Minus[key] = false
 	}
-	bfs_rev.Iterate(func(v *gograph.Vertex[string]) error {
-		algo.R_Minus[v.Label()] = true
-		return nil
-	})
+
+	// Start BFS
+	for len(queue) > 0 {
+		// Dequeue the front vertex
+		current := queue[0]
+		queue = queue[1:]
+
+		// Mark current vertex as reachable
+		algo.R_Minus[current.Label()] = true
+
+		// Enqueue all neighbors (vertices connected by an outgoing edge in the reverse graph)
+		for _, edge := range algo.ReverseGraph.AllEdges() {
+			if edge.Source().Label() == current.Label() {
+				destVertex := edge.Destination()
+				if !algo.R_Minus[destVertex.Label()] {
+					queue = append(queue, destVertex)
+				}
+			}
+		}
+	}
 }
+
 
 func (algo *SV1) InsertEdge(src string, dst string) error {
 	srcVertex := algo.Graph.GetVertexByID(src)
@@ -138,6 +200,92 @@ func (algo *SV1) DeleteEdge(src string, dst string) error {
 	return nil
 }
 
+// Directed BFS implementation
+func directedBFS(graph gograph.Graph[string], src string, dst string) (bool, error) {
+    
+    queue := []*gograph.Vertex[string]{}
+
+
+    visited := make(map[string]bool)
+
+    // Start BFS from the source vertex
+    startVertex := graph.GetVertexByID(src)
+    if startVertex == nil {
+        return false, fmt.Errorf("source vertex %s not found", src)
+    }
+    queue = append(queue, startVertex)
+    visited[src] = true
+
+    for len(queue) > 0 {
+        // Dequeue the front of the queue
+        currentVertex := queue[0]
+        queue = queue[1:]
+
+        // If we reach the destination vertex return true
+        if currentVertex.Label() == dst {
+            return true, nil
+        }
+
+        // Get all edges from the current vertex
+        for _, edge := range graph.AllEdges() {
+            // Check if the edge starts from the current vertex (directed edge)
+            if edge.Source().Label() == currentVertex.Label() {
+                nextVertex := edge.Destination()
+                if !visited[nextVertex.Label()] {
+                    visited[nextVertex.Label()] = true
+                    queue = append(queue, nextVertex)
+                }
+            }
+        }
+    }
+
+    // If we exhaust the queue without finding the destination, return false
+    return false, nil
+}
+
+// Directed BFS implementation without a specific destination
+func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]string, error) {
+    // Queue for BFS
+    queue := []*gograph.Vertex[string]{}
+
+    
+    visited := make(map[string]bool)
+
+    
+    reachableVertices := []string{}
+
+    // Start BFS from the source vertex
+    startVertex := graph.GetVertexByID(src)
+    if startVertex == nil {
+        return nil, fmt.Errorf("source vertex %s not found", src)
+    }
+    queue = append(queue, startVertex)
+    visited[src] = true
+    reachableVertices = append(reachableVertices, src)
+
+    for len(queue) > 0 {
+        // Dequeue the front of the queue
+        currentVertex := queue[0]
+        queue = queue[1:]
+
+        // Get all edges from the current vertex
+        for _, edge := range graph.AllEdges() {
+            // Check if the edge starts from the current vertex (directed edge)
+            if edge.Source().Label() == currentVertex.Label() {
+                nextVertex := edge.Destination()
+                if !visited[nextVertex.Label()] {
+                    visited[nextVertex.Label()] = true
+                    reachableVertices = append(reachableVertices, nextVertex.Label())
+                    queue = append(queue, nextVertex)
+                }
+            }
+        }
+    }
+
+    return reachableVertices, nil
+}
+
+
 func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 	svLabel := algo.SV.Label()
 
@@ -173,16 +321,18 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 
 	//if all else fails, fallback to BFS
 	fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
-	bfs, err := traverse.NewBreadthFirstIterator(algo.Graph, src)
+	bfs, err := directedBFS(algo.Graph, src,dst)
 	if err != nil {
 		return false, err
 	}
-	for bfs.HasNext() {
-		v := bfs.Next()
-		if v.Label() == dst {
-			return true, nil
-		}
-	}
+	// for bfs.HasNext() {
+	// 	v := bfs.Next()
+	// 	if v.Label() == dst {
+	// 		return true, nil
+	// 	}
+	// }
+	if bfs == true{
+		return true,nil }
 	return false, nil
 }
 func generateDotFile(graph gograph.Graph[string], filename string) error {
