@@ -154,7 +154,7 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 	}
 
 	//try to apply O1
-	if algo.R_Minus[src] == true && algo.R_Minus[dst] == true {
+	if algo.R_Minus[src] == true && algo.R_Plus[dst] == true {
 		fmt.Println("[CheckReachability][Resolved] Using O1")
 		return true, nil
 	}
