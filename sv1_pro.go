@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
+	"strconv"
+	"time"
+
 	"github.com/hmdsefi/gograph"
 	"github.com/hmdsefi/gograph/traverse"
-	"math/rand"
 )
 
 // Fully Dynamic Transitive Closure Index
@@ -183,32 +186,62 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 }
 
 func main() {
+ 
+
+	// Initialize random seed
+	rand.Seed(time.Now().UnixNano())
+
+	// Create a new directed graph
 	graph := gograph.New[string](gograph.Directed())
 
-	a := gograph.NewVertex("a")
-	graph.AddVertex(a)
-	b := gograph.NewVertex("b")
-	graph.AddVertex(b)
-	c := gograph.NewVertex("c")
-	graph.AddVertex(c)
-	d := gograph.NewVertex("d")
-	graph.AddVertex(d)
+	// Create vertices 
+	vertexCount := 50
+	vertices := make([]*gograph.Vertex[string], vertexCount)
+	for i := 0; i < vertexCount; i++ {
+		label := "v" + strconv.Itoa(i)
+		vertices[i] = gograph.NewVertex(label)
+		graph.AddVertex(vertices[i])
+	}
 
-	graph.AddEdge(a, b)
-	graph.AddEdge(a, c)
-	graph.AddEdge(b, d)
+	
+	edgeCount := 100
+	for i := 0; i < edgeCount; i++ {
+		srcIndex := rand.Intn(vertexCount)
+		dstIndex := rand.Intn(vertexCount)
 
+		// Ensure no self-loops
+		for srcIndex == dstIndex {
+			dstIndex = rand.Intn(vertexCount)
+		}
+
+		graph.AddEdge(vertices[srcIndex], vertices[dstIndex])
+		fmt.Printf("Edge added: %s -> %s\n", vertices[srcIndex].Label(), vertices[dstIndex].Label())
+	}
+
+	// Initialize the SV1 transitive closure index
 	index := SV1{}
 	index.NewIndex(graph)
 
-	fmt.Println(index.CheckReachability("a", "d"))
-	fmt.Println(index.CheckReachability("c", "d"))
-	fmt.Println(index.CheckReachability("b", "d"))
-	fmt.Println(index.CheckReachability("c", "a"))
+	// Perform some reachability tests
+	testCases := [][2]string{
+		{"v0", "v10"},
+		{"v10", "v20"},
+		{"v20", "v30"},
+		{"v30", "v40"},
+		{"v40", "v0"},
+		{"v5", "v25"},
+		{"v25", "v5"},
+		{"v48","v50"},
+	}
 
-	index.InsertEdge("c", "e")
-	fmt.Println(index.CheckReachability("a", "e"))
-
-	index.DeleteEdge("a", "b")
-	fmt.Println(index.CheckReachability("a", "e"))
+	fmt.Println("\nReachability Tests:")
+	for _, test := range testCases {
+		src, dst := test[0], test[1]
+		reachable, err := index.CheckReachability(src, dst)
+		if err != nil {
+			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
+		} else {
+			fmt.Printf("Is %s reachable from %s? %v\n", dst, src, reachable)
+		}
+	}
 }
