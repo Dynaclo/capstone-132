@@ -103,11 +103,11 @@ func (algo *SV1) recomputeRPlus() {
 
 	// Start BFS
 	for len(queue) > 0 {
-		// Dequeue the front vertex
+	
 		current := queue[0]
 		queue = queue[1:]
 
-		// Mark current vertex as reachable
+		
 		algo.R_Plus[current.Label()] = true
 
 		// Enqueue all neighbors (vertices connected by an outgoing edge)
@@ -123,24 +123,24 @@ func (algo *SV1) recomputeRPlus() {
 }
 
 func (algo *SV1) recomputeRMinus() {
-	// Initialize a queue for BFS
+
 	queue := []*gograph.Vertex[string]{algo.SV}
 
-	// Reset R_Minus to mark all vertices as not reachable
+
 	for key := range algo.R_Minus {
 		algo.R_Minus[key] = false
 	}
 
 	// Start BFS
 	for len(queue) > 0 {
-		// Dequeue the front vertex
+		
 		current := queue[0]
 		queue = queue[1:]
 
-		// Mark current vertex as reachable
+		 
 		algo.R_Minus[current.Label()] = true
 
-		// Enqueue all neighbors (vertices connected by an outgoing edge in the reverse graph)
+ 
 		for _, edge := range algo.ReverseGraph.AllEdges() {
 			if edge.Source().Label() == current.Label() {
 				destVertex := edge.Destination()
