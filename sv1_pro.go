@@ -2,16 +2,19 @@ package main
 
 import (
 	"fmt"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/plotutil"
-	"gonum.org/v1/plot/vg"
 	"math"
 	"math/rand"
 	"os"
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/opts"
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/plotutil"
+	"gonum.org/v1/plot/vg"
 
 	//"github.com/Smuzzy-waiii/capstone-132"
 	"github.com/hmdsefi/gograph"
@@ -312,12 +315,13 @@ func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]s
 	return reachableVertices, nil
 }
 
-func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
+func (algo *SV1) CheckReachability(src string, dst string,resolutionCounts map[string]int) (bool, error) {
 	svLabel := algo.SV.Label()
 
 	//if src is support vertex
 	if svLabel == src {
 		//fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
+		
 		return algo.R_Plus[dst], nil
 	}
 
@@ -329,24 +333,28 @@ func (algo *SV1) CheckReachability(src string, dst string) (bool, error) {
 
 	//try to apply O1
 	if algo.R_Minus[src] == true && algo.R_Plus[dst] == true {
+		resolutionCounts["o1"]+=1
 		//fmt.Println("[CheckReachability][Resolved] Using O1")
 		return true, nil
 	}
 
 	//try to apply O2
 	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
+		resolutionCounts["o2"]+=1
 		//fmt.Println("[CheckReachability][Resolved] Using O2")
 		return false, nil
 	}
 
 	//try to apply O3
 	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
+		resolutionCounts["o3"]+=1
 		//fmt.Println("[CheckReachability][Resolved] Using O3")
 		return false, nil
 	}
 
 	//if all else fails, fallback to BFS
 	//fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
+	resolutionCounts["bfs"]+=1
 	bfs, err := directedBFS(algo.Graph, src, dst)
 	if err != nil {
 		return false, err
@@ -445,7 +453,13 @@ func main() {
 
 	// Create a new directed graph
 	graph := gograph.New[string](gograph.Directed())
-
+	
+	resolutionCounts := map[string]int{
+		"o1":  0,
+		"o2":  0,
+		"o3":   0, 
+		"bfs": 0, 
+	}
 	// Create vertices
 	vertexCount := 300
 	vertices := make([]*gograph.Vertex[string], vertexCount)
@@ -455,7 +469,7 @@ func main() {
 		graph.AddVertex(vertices[i])
 	}
 
-	edgeCount := 1000
+	edgeCount := 2000
 	for i := 0; i < edgeCount; i++ {
 		srcIndex := rand.Intn(vertexCount)
 		dstIndex := rand.Intn(vertexCount)
@@ -481,7 +495,7 @@ func main() {
 	index := SV1{}
 	index.NewIndex(graph)
 
-	testcases := generateTestCases(&graph, 100)
+	testcases := generateTestCases(&graph, 11200)
 
 	fmt.Println("\nReachability Tests Using the SV1 Index:")
 	sv1Times := []DataPoint{}
@@ -489,7 +503,7 @@ func main() {
 		src, dst := test[0], test[1]
 
 		startTime := time.Now()
-		_, err := index.CheckReachability(src, dst)
+		_, err := index.CheckReachability(src, dst,resolutionCounts)
 		if err != nil {
 			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
 		}
@@ -523,6 +537,7 @@ func main() {
 	printStatistics(bfsTimes)
 
 	plotResults(bfsTimes, sv1Times)
+	makePieChart(resolutionCounts)
 }
 
 type DataPoint struct {
@@ -553,7 +568,70 @@ func printStatistics(dataPoints []DataPoint) {
 	fmt.Printf("99th percentile: %v\n", calculatePercentile(dataPoints, 99))
 	fmt.Printf("99.9th percentile: %v\n", calculatePercentile(dataPoints, 99.9))
 }
+// func createPieChart(resolutionCounts map[string]int) {
+//     // create a new pie instance
+//     pie := charts.NewPie()
+//     pie.SetGlobalOptions(
+//         charts.WithTitleOpts(
+//             opts.Title{
+//                 Title:    "Which policies were used",
+//                 Subtitle: "O1,O2,O3,BFS",
+//             },
+//         ),
+//     )
+//     pie.SetSeriesOptions()
+//     pie.AddSeries("Monthly revenue",
+//         resolutionCounts.).
+//         SetSeriesOptions(
+//             charts.WithPieChartOpts(
+//                 opts.PieChart{
+//                     Radius: 200,
+//                 },
+//             ),
+//             charts.WithLabelOpts(
+//                 opts.Label{
+//                     Show:      true,
+//                     Formatter: "{b}: {c}",
+//                 },
+//             ),
+//         )
+//     f, _ := os.Create("pie.html")
+//     _ = pie.Render(f)
+// }
+func makePieChart(data map[string]int) {
+    // Create a new pie chart instance
+    pie := charts.NewPie()
 
+    // Convert data map to slices for plotting
+    var items []opts.PieData
+    for label, value := range data {
+        items = append(items, opts.PieData{
+            Name:  label,
+            Value: float64(value),
+        })
+    }
+
+    // Set pie chart options
+    pie.SetGlobalOptions(
+        charts.WithTitleOpts(opts.Title{
+            Title: "Pie Chart",
+        }),
+    )
+    pie.AddSeries("Pie Chart", items)
+
+    // Save the chart to a file
+    f, err := os.Create("piechart.html")
+    if err != nil {
+        panic(err)
+    }
+    defer f.Close()
+
+    if err := pie.Render(f); err != nil {
+        panic(err)
+    }
+
+    fmt.Println("Pie chart saved as piechart.html")
+}
 func calculateMean(dataPoints []DataPoint) time.Duration {
 	total := time.Duration(0)
 	for _, dp := range dataPoints {
@@ -584,3 +662,5 @@ func calculatePercentile(dataPoints []DataPoint, percentile float64) time.Durati
 	}
 	return dataPoints[int(math.Ceil(index))-1].Duration
 }
+
+
