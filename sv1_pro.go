@@ -2,19 +2,10 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
-	"os"
 	"sort"
 	"strconv"
 	"time"
-
-	"github.com/go-echarts/go-echarts/v2/charts"
-	"github.com/go-echarts/go-echarts/v2/opts"
-	"gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
-	"gonum.org/v1/plot/plotutil"
-	"gonum.org/v1/plot/vg"
 
 	//"github.com/Smuzzy-waiii/capstone-132"
 	"github.com/hmdsefi/gograph"
@@ -315,46 +306,45 @@ func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]s
 	return reachableVertices, nil
 }
 
-func (algo *SV1) CheckReachability(src string, dst string,resolutionCounts map[string]int) (bool, error) {
+func (algo *SV1) CheckReachability(src string, dst string, resolutionCounts map[string]int) (bool, error) {
 	svLabel := algo.SV.Label()
 
 	//if src is support vertex
 	if svLabel == src {
-		//fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
-		
+		fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
 		return algo.R_Plus[dst], nil
 	}
 
 	//if dest is support vertex
 	if svLabel == dst {
-		//fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
+		fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
 		return algo.R_Minus[dst], nil
 	}
 
 	//try to apply O1
 	if algo.R_Minus[src] == true && algo.R_Plus[dst] == true {
-		resolutionCounts["o1"]+=1
+		resolutionCounts["o1"] += 1
 		//fmt.Println("[CheckReachability][Resolved] Using O1")
 		return true, nil
 	}
 
 	//try to apply O2
 	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
-		resolutionCounts["o2"]+=1
+		resolutionCounts["o2"] += 1
 		//fmt.Println("[CheckReachability][Resolved] Using O2")
 		return false, nil
 	}
 
 	//try to apply O3
 	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
-		resolutionCounts["o3"]+=1
+		resolutionCounts["o3"] += 1
 		//fmt.Println("[CheckReachability][Resolved] Using O3")
 		return false, nil
 	}
 
 	//if all else fails, fallback to BFS
 	//fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
-	resolutionCounts["bfs"]+=1
+	resolutionCounts["bfs"] += 1
 	bfs, err := directedBFS(algo.Graph, src, dst)
 	if err != nil {
 		return false, err
@@ -370,81 +360,6 @@ func (algo *SV1) CheckReachability(src string, dst string,resolutionCounts map[s
 	}
 	return false, nil
 }
-func generateDotFile(graph gograph.Graph[string], filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.WriteString("digraph G {\n")
-	if err != nil {
-		return err
-	}
-
-	for _, edge := range graph.AllEdges() {
-		line := fmt.Sprintf("  \"%s\" -> \"%s\";\n", edge.Source().Label(), edge.Destination().Label())
-		_, err := file.WriteString(line)
-		if err != nil {
-			return err
-		}
-	}
-
-	_, err = file.WriteString("}\n")
-	return err
-}
-
-func generateTestCases(graph *gograph.Graph[string], numCases int) [][2]string {
-	rand.Seed(time.Now().UnixNano())
-	vertices := (*graph).GetAllVertices()
-	vertexCount := len(vertices)
-
-	testCases := make([][2]string, numCases)
-	for i := 0; i < numCases; i++ {
-		srcIndex := rand.Intn(vertexCount)
-		dstIndex := rand.Intn(vertexCount)
-
-		testCases[i] = [2]string{
-			vertices[srcIndex].Label(),
-			vertices[dstIndex].Label(),
-		}
-	}
-
-	return testCases
-}
-
-func plotResults(bfsTimes, sv1Times []DataPoint) {
-	p := plot.New()
-
-	p.Title.Text = "BFS vs SV1 Performance"
-	p.X.Label.Text = "Test Cases"
-	p.Y.Label.Text = "Time (ns)"
-
-	// Set log scales for both axes
-	p.Y.Scale = plot.LogScale{}
-
-	pts1 := make(plotter.XYs, len(bfsTimes))
-	pts2 := make(plotter.XYs, len(sv1Times))
-
-	for i := range bfsTimes {
-		pts1[i].X = float64(i + 1)
-		pts1[i].Y = float64(bfsTimes[i].Duration)
-	}
-
-	for i := range sv1Times {
-		pts2[i].X = float64(i + 1)
-		pts2[i].Y = float64(sv1Times[i].Duration)
-	}
-
-	err := plotutil.AddLinePoints(p, "BFS", pts1, "SV1", pts2)
-	if err != nil {
-		panic(err)
-	}
-
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, "performance.png"); err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -453,15 +368,15 @@ func main() {
 
 	// Create a new directed graph
 	graph := gograph.New[string](gograph.Directed())
-	
+
 	resolutionCounts := map[string]int{
 		"o1":  0,
 		"o2":  0,
-		"o3":   0, 
-		"bfs": 0, 
+		"o3":  0,
+		"bfs": 0,
 	}
 	// Create vertices
-	vertexCount := 300
+	vertexCount := 3000
 	vertices := make([]*gograph.Vertex[string], vertexCount)
 	for i := 0; i < vertexCount; i++ {
 		label := "v" + strconv.Itoa(i)
@@ -469,7 +384,7 @@ func main() {
 		graph.AddVertex(vertices[i])
 	}
 
-	edgeCount := 2000
+	edgeCount := 10000
 	for i := 0; i < edgeCount; i++ {
 		srcIndex := rand.Intn(vertexCount)
 		dstIndex := rand.Intn(vertexCount)
@@ -499,19 +414,29 @@ func main() {
 
 	fmt.Println("\nReachability Tests Using the SV1 Index:")
 	sv1Times := []DataPoint{}
+
+	sv1_results := make(chan DataPoint, len(testcases))
 	for _, test := range testcases {
 		src, dst := test[0], test[1]
 
 		startTime := time.Now()
-		_, err := index.CheckReachability(src, dst,resolutionCounts)
+		_, err := index.CheckReachability(src, dst, resolutionCounts)
 		if err != nil {
 			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
 		}
 		endTime := time.Now()
 		timeTaken := endTime.Sub(startTime)
 
-		sv1Times = append(sv1Times, DataPoint{TimeOfEntry: startTime, Duration: timeTaken})
+		sv1_results <- DataPoint{TimeOfEntry: startTime, Duration: timeTaken}
+
 	}
+
+	// Collect sv1_results
+	for i := 0; i < len(testcases); i++ {
+		sv1Times = append(sv1Times, <-sv1_results)
+	}
+	close(sv1_results)
+
 	// Sort the data points by Duration
 	sort.Slice(sv1Times, func(i, j int) bool {
 		return sv1Times[i].Duration < sv1Times[j].Duration
@@ -520,16 +445,28 @@ func main() {
 
 	fmt.Println("\nReachability Tests Using the BFS:")
 	bfsTimes := []DataPoint{}
+
+	bfs_results := make(chan DataPoint, len(testcases))
+
 	for _, test := range testcases {
 		src, dst := test[0], test[1]
 
-		startTime := time.Now()
-		_ = bfs(&graph, src, dst)
-		endTime := time.Now()
-		timeTaken := endTime.Sub(startTime)
+		go func(src, dst string) {
+			startTime := time.Now()
+			_ = bfs(&graph, src, dst)
+			endTime := time.Now()
+			timeTaken := endTime.Sub(startTime)
 
-		bfsTimes = append(bfsTimes, DataPoint{TimeOfEntry: startTime, Duration: timeTaken})
+			bfs_results <- DataPoint{TimeOfEntry: startTime, Duration: timeTaken}
+		}(src, dst)
 	}
+
+	// Collect sv1_results
+	for i := 0; i < len(testcases); i++ {
+		bfsTimes = append(bfsTimes, <-bfs_results)
+	}
+	close(bfs_results)
+
 	// Sort the data points by Duration
 	sort.Slice(bfsTimes, func(i, j int) bool {
 		return bfsTimes[i].Duration < bfsTimes[j].Duration
@@ -539,128 +476,3 @@ func main() {
 	plotResults(bfsTimes, sv1Times)
 	makePieChart(resolutionCounts)
 }
-
-type DataPoint struct {
-	TimeOfEntry time.Time
-	Duration    time.Duration
-}
-
-func printStatistics(dataPoints []DataPoint) {
-	n := len(dataPoints)
-	if n == 0 {
-		fmt.Println("No data points available")
-		return
-	}
-
-	min_ := dataPoints[0].Duration
-	max_ := dataPoints[n-1].Duration
-	mean := calculateMean(dataPoints)
-	median := calculateMedian(dataPoints)
-	q1, q3 := calculateQuartiles(dataPoints)
-
-	fmt.Println("Statistics:")
-	fmt.Printf("Min: %v\n", min_)
-	fmt.Printf("Max: %v\n", max_)
-	fmt.Printf("Mean: %v\n", mean)
-	fmt.Printf("Median: %v\n", median)
-	fmt.Printf("Q1 (25th percentile): %v\n", q1)
-	fmt.Printf("Q3 (75th percentile): %v\n", q3)
-	fmt.Printf("99th percentile: %v\n", calculatePercentile(dataPoints, 99))
-	fmt.Printf("99.9th percentile: %v\n", calculatePercentile(dataPoints, 99.9))
-}
-// func createPieChart(resolutionCounts map[string]int) {
-//     // create a new pie instance
-//     pie := charts.NewPie()
-//     pie.SetGlobalOptions(
-//         charts.WithTitleOpts(
-//             opts.Title{
-//                 Title:    "Which policies were used",
-//                 Subtitle: "O1,O2,O3,BFS",
-//             },
-//         ),
-//     )
-//     pie.SetSeriesOptions()
-//     pie.AddSeries("Monthly revenue",
-//         resolutionCounts.).
-//         SetSeriesOptions(
-//             charts.WithPieChartOpts(
-//                 opts.PieChart{
-//                     Radius: 200,
-//                 },
-//             ),
-//             charts.WithLabelOpts(
-//                 opts.Label{
-//                     Show:      true,
-//                     Formatter: "{b}: {c}",
-//                 },
-//             ),
-//         )
-//     f, _ := os.Create("pie.html")
-//     _ = pie.Render(f)
-// }
-func makePieChart(data map[string]int) {
-    // Create a new pie chart instance
-    pie := charts.NewPie()
-
-    // Convert data map to slices for plotting
-    var items []opts.PieData
-    for label, value := range data {
-        items = append(items, opts.PieData{
-            Name:  label,
-            Value: float64(value),
-        })
-    }
-
-    // Set pie chart options
-    pie.SetGlobalOptions(
-        charts.WithTitleOpts(opts.Title{
-            Title: "Pie Chart",
-        }),
-    )
-    pie.AddSeries("Pie Chart", items)
-
-    // Save the chart to a file
-    f, err := os.Create("piechart.html")
-    if err != nil {
-        panic(err)
-    }
-    defer f.Close()
-
-    if err := pie.Render(f); err != nil {
-        panic(err)
-    }
-
-    fmt.Println("Pie chart saved as piechart.html")
-}
-func calculateMean(dataPoints []DataPoint) time.Duration {
-	total := time.Duration(0)
-	for _, dp := range dataPoints {
-		total += dp.Duration
-	}
-	return total / time.Duration(len(dataPoints))
-}
-
-func calculateMedian(dataPoints []DataPoint) time.Duration {
-	n := len(dataPoints)
-	if n%2 == 0 {
-		return (dataPoints[n/2-1].Duration + dataPoints[n/2].Duration) / 2
-	}
-	return dataPoints[n/2].Duration
-}
-
-func calculateQuartiles(dataPoints []DataPoint) (q1, q3 time.Duration) {
-	q1 = calculatePercentile(dataPoints, 25)
-	q3 = calculatePercentile(dataPoints, 75)
-	return
-}
-
-func calculatePercentile(dataPoints []DataPoint, percentile float64) time.Duration {
-	index := float64(len(dataPoints)) * percentile / 100.0
-	if index == float64(int(index)) {
-		i := int(index)
-		return (dataPoints[i-1].Duration + dataPoints[i].Duration) / 2
-	}
-	return dataPoints[int(math.Ceil(index))-1].Duration
-}
-
-
