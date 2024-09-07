@@ -306,44 +306,58 @@ func directedBFSWithoutDestination(graph gograph.Graph[string], src string) ([]s
 	return reachableVertices, nil
 }
 
-func (algo *SV1) CheckReachability(src string, dst string, resolutionCounts map[string]int) (bool, error) {
+func (algo *SV1) CheckReachability(src string, dst string, resolutionCounts map[string]int, debugPrint bool) (bool, error) {
 	svLabel := algo.SV.Label()
 
 	//if src is support vertex
 	if svLabel == src {
-		fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
+		resolutionCounts["src"] += 1
+		if debugPrint {
+			fmt.Println("[CheckReachability][Resolved] Src vertex is SV")
+		}
 		return algo.R_Plus[dst], nil
 	}
 
 	//if dest is support vertex
 	if svLabel == dst {
-		fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
+		resolutionCounts["dst"] += 1
+		if debugPrint {
+			fmt.Println("[CheckReachability][Resolved] Dst vertex is SV")
+		}
 		return algo.R_Minus[dst], nil
 	}
 
 	//try to apply O1
 	if algo.R_Minus[src] == true && algo.R_Plus[dst] == true {
 		resolutionCounts["o1"] += 1
-		//fmt.Println("[CheckReachability][Resolved] Using O1")
+		if debugPrint {
+			fmt.Println("[CheckReachability][Resolved] Using O1")
+		}
 		return true, nil
 	}
 
 	//try to apply O2
 	if algo.R_Plus[src] == true && algo.R_Plus[dst] == false {
 		resolutionCounts["o2"] += 1
-		//fmt.Println("[CheckReachability][Resolved] Using O2")
+		if debugPrint {
+			fmt.Println("[CheckReachability][Resolved] Using O2")
+		}
 		return false, nil
 	}
 
 	//try to apply O3
 	if algo.R_Minus[src] == false && algo.R_Minus[dst] == true {
 		resolutionCounts["o3"] += 1
-		//fmt.Println("[CheckReachability][Resolved] Using O3")
+		if debugPrint {
+			fmt.Println("[CheckReachability][Resolved] Using O3")
+		}
 		return false, nil
 	}
 
 	//if all else fails, fallback to BFS
-	//fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
+	if debugPrint {
+		fmt.Println("[CheckReachability][Resolved] Fallback to BFS")
+	}
 	resolutionCounts["bfs"] += 1
 	bfs, err := directedBFS(algo.Graph, src, dst)
 	if err != nil {
@@ -370,13 +384,15 @@ func main() {
 	graph := gograph.New[string](gograph.Directed())
 
 	resolutionCounts := map[string]int{
+		"src": 0,
+		"dst": 0,
 		"o1":  0,
 		"o2":  0,
 		"o3":  0,
 		"bfs": 0,
 	}
 	// Create vertices
-	vertexCount := 3000
+	vertexCount := 300
 	vertices := make([]*gograph.Vertex[string], vertexCount)
 	for i := 0; i < vertexCount; i++ {
 		label := "v" + strconv.Itoa(i)
@@ -384,7 +400,7 @@ func main() {
 		graph.AddVertex(vertices[i])
 	}
 
-	edgeCount := 10000
+	edgeCount := 1000
 	for i := 0; i < edgeCount; i++ {
 		srcIndex := rand.Intn(vertexCount)
 		dstIndex := rand.Intn(vertexCount)
@@ -410,69 +426,48 @@ func main() {
 	index := SV1{}
 	index.NewIndex(graph)
 
-	testcases := generateTestCases(&graph, 11200)
+	testcases := generateTestCases(&graph, 1000)
 
-	fmt.Println("\nReachability Tests Using the SV1 Index:")
 	sv1Times := []DataPoint{}
+	bfsTimes := []DataPoint{}
 
-	sv1_results := make(chan DataPoint, len(testcases))
-	for _, test := range testcases {
+	for i, test := range testcases {
 		src, dst := test[0], test[1]
 
 		startTime := time.Now()
-		_, err := index.CheckReachability(src, dst, resolutionCounts)
+		isReachableSV1, err := index.CheckReachability(src, dst, resolutionCounts, false)
 		if err != nil {
 			fmt.Printf("Error checking reachability from %s to %s: %v\n", src, dst, err)
 		}
 		endTime := time.Now()
 		timeTaken := endTime.Sub(startTime)
+		sv1Times = append(sv1Times, DataPoint{TimeOfEntry: startTime, Duration: timeTaken, IsReachable: isReachableSV1})
 
-		sv1_results <- DataPoint{TimeOfEntry: startTime, Duration: timeTaken}
+		startTime = time.Now()
+		isReachableBFS := bfs(&graph, src, dst)
+		endTime = time.Now()
+		timeTaken = endTime.Sub(startTime)
+		bfsTimes = append(bfsTimes, DataPoint{TimeOfEntry: startTime, Duration: timeTaken, IsReachable: isReachableBFS})
 
+		fmt.Printf("Testcase %d: %t\n", i, isReachableSV1 == isReachableBFS)
 	}
-
-	// Collect sv1_results
-	for i := 0; i < len(testcases); i++ {
-		sv1Times = append(sv1Times, <-sv1_results)
-	}
-	close(sv1_results)
 
 	// Sort the data points by Duration
 	sort.Slice(sv1Times, func(i, j int) bool {
 		return sv1Times[i].Duration < sv1Times[j].Duration
 	})
+	fmt.Println("\nReachability Tests Using the SV1 Index:")
 	printStatistics(sv1Times)
-
-	fmt.Println("\nReachability Tests Using the BFS:")
-	bfsTimes := []DataPoint{}
-
-	bfs_results := make(chan DataPoint, len(testcases))
-
-	for _, test := range testcases {
-		src, dst := test[0], test[1]
-
-		go func(src, dst string) {
-			startTime := time.Now()
-			_ = bfs(&graph, src, dst)
-			endTime := time.Now()
-			timeTaken := endTime.Sub(startTime)
-
-			bfs_results <- DataPoint{TimeOfEntry: startTime, Duration: timeTaken}
-		}(src, dst)
-	}
-
-	// Collect sv1_results
-	for i := 0; i < len(testcases); i++ {
-		bfsTimes = append(bfsTimes, <-bfs_results)
-	}
-	close(bfs_results)
 
 	// Sort the data points by Duration
 	sort.Slice(bfsTimes, func(i, j int) bool {
 		return bfsTimes[i].Duration < bfsTimes[j].Duration
 	})
+	fmt.Println("\nReachability Tests Using the BFS:")
 	printStatistics(bfsTimes)
 
 	plotResults(bfsTimes, sv1Times)
 	makePieChart(resolutionCounts)
+
+	fmt.Print(resolutionCounts)
 }

@@ -18,6 +18,7 @@ import (
 type DataPoint struct {
 	TimeOfEntry time.Time
 	Duration    time.Duration
+	IsReachable bool
 }
 
 func makePieChart(data map[string]int) {
